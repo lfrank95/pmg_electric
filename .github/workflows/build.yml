@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows (VST3)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --target PMGElectric_VST3 --parallel
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: PMG-Electric-VST3-win64
+          path: build/PMGElectric_artefacts/Release/VST3/
+          if-no-files-found: error
+
+  mac:
+    name: macOS (VST3)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Configure (Universal Binary)"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target PMGElectric_VST3 --parallel
+
+      - name: Sign (ad hoc) and package
+        run: |
+          vst=$(find build/PMGElectric_artefacts -name "PMG Electric.vst3" -type d -maxdepth 4 | head -1)
+          codesign --force --deep --sign - "$vst"
+          mkdir -p dist && ditto -c -k --keepParent "$vst" dist/PMG-Electric-VST3-macOS.zip
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: PMG-Electric-VST3-macOS
+          path: dist/PMG-Electric-VST3-macOS.zip
+          if-no-files-found: error
